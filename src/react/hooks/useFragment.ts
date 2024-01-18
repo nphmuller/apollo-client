@@ -64,9 +64,15 @@ export function useFragment<TData = any, TVars = OperationVariables>(
     };
   }, [options]);
 
+  // TODO: use regular useRef here and set the value inside of useMemo
   const resultRef = useLazyRef<UseFragmentResult<TData>>(() =>
     diffToResult(cache.diff<TData>(diffOptions))
   );
+  // explain the timing issue: since next is async, we need to make sure that we
+  // get the correct diff on next render given new diffOptions
+  React.useMemo(() => {
+    resultRef.current = diffToResult(cache.diff<TData>(diffOptions));
+  }, [diffOptions, cache]);
 
   // Used for both getSnapshot and getServerSnapshot
   const getSnapshot = React.useCallback(() => resultRef.current, []);
@@ -78,6 +84,8 @@ export function useFragment<TData = any, TVars = OperationVariables>(
         const subscription = cache.watchFragment(options).subscribe({
           next: (result) => {
             resultRef.current = result;
+            // TODO: add comment back here
+            clearTimeout(lastTimeout);
             lastTimeout = setTimeout(forceUpdate) as any;
           },
         });
